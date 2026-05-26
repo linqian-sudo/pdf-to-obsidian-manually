@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF to Obsidian Manually</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="side-panel left-panel">
+        <div class="brand-row">
+          <div class="brand-mark">P</div>
+          <div>
+            <h1>PDF to Obsidian Manually</h1>
+            <p id="documentStatus">等待 PDF</p>
+          </div>
+        </div>
+
+        <label class="file-drop" for="pdfInput">
+          <i data-lucide="file-up"></i>
+          <span>上传 PDF</span>
+          <small id="fileName">标准 / 图纸 / 扫描件</small>
+        </label>
+        <input id="pdfInput" type="file" accept="application/pdf" />
+
+        <section class="tool-section" aria-label="圈选工具">
+          <div class="section-title">圈选类型</div>
+          <div class="tool-grid" role="group" aria-label="选择圈选类型">
+            <button class="tool-button active" type="button" data-mode="text" title="重要文字">
+              <i data-lucide="type"></i>
+            </button>
+            <button class="tool-button" type="button" data-mode="figure" title="图形">
+              <i data-lucide="image"></i>
+            </button>
+            <button class="tool-button" type="button" data-mode="table" title="表格">
+              <i data-lucide="table-2"></i>
+            </button>
+            <button class="tool-button delete-tool" type="button" data-mode="erase" title="删除区域">
+              <i data-lucide="eraser"></i>
+            </button>
+          </div>
+        </section>
+
+        <section class="tool-section" aria-label="视图控制">
+          <div class="section-title">缩放</div>
+          <div class="zoom-row">
+            <button class="icon-button" type="button" id="zoomOut" title="缩小">
+              <i data-lucide="minus"></i>
+            </button>
+            <output id="zoomValue">140%</output>
+            <button class="icon-button" type="button" id="zoomIn" title="放大">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+        </section>
+
+        <section class="tool-section export-section" aria-label="导出">
+          <button class="primary-button" type="button" id="exportButton" disabled>
+            <i data-lucide="package-check"></i>
+            <span>导出 Obsidian 包</span>
+          </button>
+          <button class="ghost-button" type="button" id="clearButton" disabled>
+            <i data-lucide="trash-2"></i>
+            <span>清空圈选</span>
+          </button>
+        </section>
+      </aside>
+
+      <section class="viewer-panel" aria-label="PDF 预览">
+        <div class="viewer-toolbar">
+          <div class="mode-pill" id="activeMode">
+            <span class="mode-dot text-dot"></span>
+            <span>重要文字</span>
+          </div>
+          <div class="status-line" id="processingStatus">选择 PDF 后开始圈选</div>
+        </div>
+        <div class="pdf-scroll" id="pdfViewer">
+          <div class="empty-state">
+            <i data-lucide="file-scan"></i>
+            <strong>PDF 预览区</strong>
+            <span>上传后在页面上拖拽圈选内容</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel right-panel">
+        <div class="section-title">内容清单</div>
+        <div class="summary-grid">
+          <div>
+            <strong id="textCount">0</strong>
+            <span>文字</span>
+          </div>
+          <div>
+            <strong id="figureCount">0</strong>
+            <span>图形</span>
+          </div>
+          <div>
+            <strong id="tableCount">0</strong>
+            <span>表格</span>
+          </div>
+        </div>
+
+        <div class="selection-list" id="selectionList">
+          <div class="list-empty">暂无圈选</div>
+        </div>
+      </aside>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
