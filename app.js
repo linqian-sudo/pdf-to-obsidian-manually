@@ -577,7 +577,7 @@ async function exportObsidianPackage() {
     markdownParts.push("");
   }
 
-  root.file(`${state.baseName}.md`, markdownParts.join("\n"));
+  root.file(`${state.baseName}.md`, `\uFEFF${markdownParts.join("\n")}`);
   root.file(
     "manifest.json",
     JSON.stringify(
