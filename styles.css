@@ -1,5 +1,7 @@
 :root {
   color-scheme: light;
+  --left-panel-width: 280px;
+  --right-panel-width: 320px;
   --bg: #f6f4ef;
   --panel: #ffffff;
   --panel-strong: #faf9f6;
@@ -20,7 +22,9 @@
 
 html,
 body {
+  height: 100%;
   min-height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -49,9 +53,10 @@ button:disabled {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 280px minmax(420px, 1fr) 320px;
+  grid-template-columns: var(--left-panel-width) minmax(420px, 1fr) var(--right-panel-width);
   height: 100vh;
   min-height: 680px;
+  overflow: hidden;
 }
 
 .side-panel {
@@ -66,14 +71,21 @@ button:disabled {
 
 .left-panel {
   border-right: 1px solid var(--line);
+  bottom: 0;
   height: 100vh;
+  left: 0;
+  max-height: 100vh;
   overflow-y: auto;
-  position: sticky;
+  position: fixed;
   top: 0;
+  width: var(--left-panel-width);
+  z-index: 20;
 }
 
 .right-panel {
   border-left: 1px solid var(--line);
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .brand-row {
@@ -289,8 +301,11 @@ span {
 
 .viewer-panel {
   display: grid;
+  grid-column: 2;
   grid-template-rows: 58px 1fr;
+  height: 100vh;
   min-width: 0;
+  overflow: hidden;
 }
 
 .viewer-toolbar {
@@ -338,6 +353,7 @@ span {
 }
 
 .pdf-scroll {
+  height: 100%;
   overflow: auto;
   padding: 28px;
   position: relative;
@@ -527,8 +543,12 @@ span {
 }
 
 @media (max-width: 1100px) {
+  :root {
+    --left-panel-width: 230px;
+  }
+
   .app-shell {
-    grid-template-columns: 230px minmax(360px, 1fr);
+    grid-template-columns: var(--left-panel-width) minmax(360px, 1fr);
   }
 
   .right-panel {
@@ -537,10 +557,17 @@ span {
 }
 
 @media (max-width: 760px) {
+  html,
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
     height: auto;
     min-height: 100vh;
+    overflow: visible;
   }
 
   .side-panel {
@@ -550,14 +577,19 @@ span {
   .left-panel {
     border-bottom: 1px solid var(--line);
     height: auto;
+    left: auto;
     max-height: 100vh;
     position: sticky;
     top: 0;
+    width: auto;
     z-index: 4;
   }
 
   .viewer-panel {
+    grid-column: auto;
+    height: auto;
     min-height: 620px;
+    overflow: visible;
   }
 
   .viewer-toolbar {
