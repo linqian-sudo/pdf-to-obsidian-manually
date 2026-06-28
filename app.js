@@ -584,7 +584,7 @@ async function exportObsidianPackage() {
       {
         sourcePdf: state.pdfName,
         exportedAt: new Date().toISOString(),
-        selections: ordered.map(({ id, ...selection }) => selection),
+        selections: ordered.map(toManifestSelection),
       },
       null,
       2,
@@ -620,10 +620,10 @@ function extractText(selection) {
 
   if (currentLine.length) lines.push(currentLine);
 
-  return lines
+  return normalizeExtractedText(lines
     .map((line) => joinTextLine(line.sort((a, b) => a.x - b.x)))
     .filter(Boolean)
-    .join("\n");
+    .join("\n"));
 }
 
 async function getParsedSelection(selection, code) {
@@ -645,7 +645,7 @@ async function parseSelection(selection, code) {
   const ocr = pdfText ? { text: "", confidence: 0 } : await recognizeText(imageBase64, code);
 
   selection.imageBase64 = imageBase64;
-  selection.parsedText = pdfText || ocr.text || "";
+  selection.parsedText = normalizeExtractedText(pdfText || ocr.text || "");
   selection.parsedMethod = pdfText ? "pdf" : ocr.text ? "ocr" : "image";
   selection.parsedConfidence = pdfText ? 100 : ocr.confidence || 0;
 }
@@ -660,9 +660,9 @@ async function recognizeText(imageBase64, code) {
       "chi_sim+eng",
     );
     return {
-      text: result.data.text
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
+      text: normalizeExtractedText(result.data.text
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n"))
         .trim(),
       confidence: Math.round(result.data.confidence || 0),
     };
@@ -675,6 +675,32 @@ async function recognizeText(imageBase64, code) {
 function ocrReviewNote(confidence) {
   if (!confidence) return "> OCR 识别结果，请按原文复核。";
   return `> OCR 识别结果，请按原文复核。置信度：${confidence}%`;
+}
+
+function normalizeExtractedText(text) {
+  return text
+    .replace(/\uF0D8/g, "•")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function toManifestSelection(selection) {
+  const {
+    id,
+    imageBase64,
+    parsedText,
+    parsedMethod,
+    parsedConfidence,
+    ...rest
+  } = selection;
+
+  return {
+    ...rest,
+    parsedMethod,
+    parsedConfidence,
+    parsedText: parsedText || "",
+  };
 }
 
 function joinTextLine(line) {
