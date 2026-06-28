@@ -36,6 +36,37 @@ app.use(
 );
 app.use(express.json({ limit: "1mb" }));
 
+app.get("/", (_request, response) => {
+  response.type("html").send(`<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>PDF to Obsidian Manually Backend</title>
+    <style>
+      body {
+        font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+        margin: 48px;
+        color: #22201c;
+      }
+      code {
+        background: #f1eee7;
+        border-radius: 6px;
+        padding: 2px 6px;
+      }
+      a {
+        color: #28746b;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>PDF to Obsidian Manually Backend</h1>
+    <p>后端服务正在运行。这个地址提供 API，不是前端页面。</p>
+    <p>健康检查：<a href="/api/health"><code>/api/health</code></a></p>
+    <p>前端页面请打开 <code>http://127.0.0.1:8765/</code> 或 GitHub Pages 线上地址。</p>
+  </body>
+</html>`);
+});
+
 app.get("/api/health", (_request, response) => {
   const java = getJavaInfo();
   response.json({
