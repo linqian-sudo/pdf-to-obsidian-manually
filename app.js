@@ -544,7 +544,7 @@ async function exportObsidianPackage() {
         markdownParts.push(extracted.text);
         if (extracted.method === "ocr") {
           markdownParts.push("");
-          markdownParts.push("> OCR 识别结果，请按原文复核。");
+          markdownParts.push(ocrReviewNote(extracted.confidence));
         }
       } else {
         markdownParts.push("未识别到文字，已保留原区域截图。");
@@ -564,11 +564,13 @@ async function exportObsidianPackage() {
       const extracted = await getParsedSelection(selection, code);
       root.file(path, extracted.imageBase64, { base64: true });
       markdownParts.push(`![[${path}]]`);
-      if (extracted.text) {
+      if (extracted.text && extracted.confidence >= 65) {
         markdownParts.push("");
         markdownParts.push("OCR 文本：");
         markdownParts.push("");
         markdownParts.push(extracted.text);
+        markdownParts.push("");
+        markdownParts.push(ocrReviewNote(extracted.confidence));
       }
     }
 
@@ -633,21 +635,23 @@ async function getParsedSelection(selection, code) {
     text: selection.parsedText || "",
     method: selection.parsedMethod || "image",
     imageBase64: selection.imageBase64,
+    confidence: selection.parsedConfidence || 0,
   };
 }
 
 async function parseSelection(selection, code) {
   const imageBase64 = await cropSelection(selection);
-  const ocrText = await recognizeText(imageBase64, code);
   const pdfText = selection.type === "text" ? extractText(selection) : "";
+  const ocr = pdfText ? { text: "", confidence: 0 } : await recognizeText(imageBase64, code);
 
   selection.imageBase64 = imageBase64;
-  selection.parsedText = ocrText || pdfText || "";
-  selection.parsedMethod = ocrText ? "ocr" : pdfText ? "pdf" : "image";
+  selection.parsedText = pdfText || ocr.text || "";
+  selection.parsedMethod = pdfText ? "pdf" : ocr.text ? "ocr" : "image";
+  selection.parsedConfidence = pdfText ? 100 : ocr.confidence || 0;
 }
 
 async function recognizeText(imageBase64, code) {
-  if (!window.Tesseract?.recognize) return "";
+  if (!window.Tesseract?.recognize) return { text: "", confidence: 0 };
 
   try {
     setStatus(`正在 OCR 识别 ${code}...`);
@@ -655,14 +659,22 @@ async function recognizeText(imageBase64, code) {
       `data:image/png;base64,${imageBase64}`,
       "chi_sim+eng",
     );
-    return result.data.text
+    return {
+      text: result.data.text
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
-      .trim();
+        .trim(),
+      confidence: Math.round(result.data.confidence || 0),
+    };
   } catch (error) {
     console.warn("OCR failed", error);
-    return "";
+    return { text: "", confidence: 0 };
   }
+}
+
+function ocrReviewNote(confidence) {
+  if (!confidence) return "> OCR 识别结果，请按原文复核。";
+  return `> OCR 识别结果，请按原文复核。置信度：${confidence}%`;
 }
 
 function joinTextLine(line) {
