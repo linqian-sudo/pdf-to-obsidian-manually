@@ -9,7 +9,17 @@
 - 删除工具：点击已框选区域即可单独删除
 - 导出 Obsidian zip 包
 - 浏览器端 OCR 兜底
-- 可选 OpenDataLoader PDF 后端解析整份 PDF
+- OCR 只处理已框选的文字/表格区域，不默认解析整份 PDF
+- 每个文字框选区域都会保存原始截图到 `assets/text`
+
+## 框选 OCR 工作流
+
+1. 上传 PDF。
+2. 用文字、表格、图形工具框选真正需要进入笔记的区域。
+3. 点击“解析已框选区域”，只对文字和表格框选区域做 OCR。
+4. 导出 Obsidian zip 包。
+
+导出的 Markdown 只包含人工框选过的内容，不会把整份 PDF 的无用信息写进去。
 
 ## OpenDataLoader PDF 后端
 

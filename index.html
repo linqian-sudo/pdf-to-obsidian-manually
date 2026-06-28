@@ -24,17 +24,13 @@
         </label>
         <input id="pdfInput" type="file" accept="application/pdf" />
 
-        <section class="tool-section backend-section" aria-label="OpenDataLoader 后端">
-          <div class="section-title">OpenDataLoader</div>
-          <label class="backend-url-row">
-            <span>后端地址</span>
-            <input id="backendUrl" type="url" value="http://127.0.0.1:8787" />
-          </label>
+        <section class="tool-section backend-section" aria-label="框选 OCR">
+          <div class="section-title">框选 OCR</div>
           <button class="secondary-button" type="button" id="backendParseButton" disabled>
-            <i data-lucide="server-cog"></i>
-            <span>后端解析 PDF</span>
+            <i data-lucide="scan-text"></i>
+            <span>解析已框选区域</span>
           </button>
-          <small id="backendStatus">上传 PDF 后可自动解析整份文档</small>
+          <small id="backendStatus">先框选文字或表格，再只识别这些区域</small>
         </section>
 
         <section class="tool-section" aria-label="圈选工具">

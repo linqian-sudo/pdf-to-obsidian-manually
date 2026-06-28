@@ -21,7 +21,6 @@ const state = {
   selections: [],
   pageCanvases: new Map(),
   pageTexts: new Map(),
-  backendResult: null,
   activeSelectionId: null,
   counters: { text: 0, figure: 0, table: 0 },
 };
@@ -42,7 +41,6 @@ const els = {
   textCount: document.querySelector("#textCount"),
   figureCount: document.querySelector("#figureCount"),
   tableCount: document.querySelector("#tableCount"),
-  backendUrl: document.querySelector("#backendUrl"),
   backendParseButton: document.querySelector("#backendParseButton"),
   backendStatus: document.querySelector("#backendStatus"),
 };
@@ -66,12 +64,7 @@ els.zoomIn.addEventListener("click", () => changeZoom(0.15));
 els.zoomOut.addEventListener("click", () => changeZoom(-0.15));
 els.clearButton.addEventListener("click", clearSelections);
 els.exportButton.addEventListener("click", exportObsidianPackage);
-els.backendParseButton.addEventListener("click", parseWithBackend);
-els.backendUrl.value =
-  localStorage.getItem("pdfToObsidianBackendUrl") || els.backendUrl.value;
-els.backendUrl.addEventListener("change", () => {
-  localStorage.setItem("pdfToObsidianBackendUrl", els.backendUrl.value.trim());
-});
+els.backendParseButton.addEventListener("click", parseSelectedRegions);
 
 function setMode(mode) {
   state.mode = mode;
@@ -114,12 +107,11 @@ function resetDocumentState(file) {
   state.selections = [];
   state.pageCanvases.clear();
   state.pageTexts.clear();
-  state.backendResult = null;
   state.activeSelectionId = null;
   state.counters = { text: 0, figure: 0, table: 0 };
   els.fileName.textContent = file.name;
   els.documentStatus.textContent = "读取中";
-  els.backendStatus.textContent = "可调用 OpenDataLoader 后端自动解析";
+  els.backendStatus.textContent = "先框选文字或表格，再只识别这些区域";
   els.pdfViewer.innerHTML = "";
   renderSelectionList();
 }
@@ -381,7 +373,7 @@ function renderSelectionList() {
           <button class="selection-badge ${selection.type}" type="button" title="${meta.label}">${selectionCode(selection)}</button>
           <div class="selection-meta">
             <strong>${meta.label}</strong>
-            <span>第 ${selection.pageNumber} 页 · ${Math.round(selection.width)} × ${Math.round(selection.height)}</span>
+            <span>第 ${selection.pageNumber} 页 · ${Math.round(selection.width)} × ${Math.round(selection.height)}${selection.parsedText !== undefined ? " · 已识别" : ""}</span>
           </div>
           <button class="delete-selection" type="button" data-delete="${selection.id}" title="删除">
             <i data-lucide="x"></i>
@@ -474,53 +466,40 @@ function changeZoom(delta) {
 function updateActions() {
   const hasPdf = Boolean(state.pdf);
   const hasSelections = state.selections.length > 0;
-  els.exportButton.disabled = !hasPdf || (!hasSelections && !state.backendResult);
+  const hasOcrTargets = state.selections.some((selection) =>
+    ["text", "table"].includes(selection.type),
+  );
+  els.exportButton.disabled = !hasPdf || !hasSelections;
   els.clearButton.disabled = !hasSelections;
-  els.backendParseButton.disabled = !hasPdf || !state.currentFile;
+  els.backendParseButton.disabled = !hasPdf || !hasOcrTargets;
 }
 
-async function parseWithBackend() {
-  if (!state.currentFile) return;
+async function parseSelectedRegions() {
+  const targets = [...state.selections]
+    .filter((selection) => ["text", "table"].includes(selection.type))
+    .sort(selectionSort);
 
-  const backendUrl = els.backendUrl.value.trim().replace(/\/+$/, "");
-  if (!backendUrl) {
-    els.backendStatus.textContent = "请先填写后端地址";
+  if (targets.length === 0) {
+    els.backendStatus.textContent = "请先框选文字或表格区域";
     return;
   }
 
-  localStorage.setItem("pdfToObsidianBackendUrl", backendUrl);
   els.backendParseButton.disabled = true;
-  els.backendStatus.textContent = "正在调用 OpenDataLoader PDF...";
-  setStatus("后端正在解析整份 PDF...");
+  els.backendStatus.textContent = `正在 OCR ${targets.length} 个框选区域...`;
 
   try {
-    const formData = new FormData();
-    formData.append("pdf", state.currentFile, state.currentFile.name);
-    formData.append("format", "markdown,json");
-    formData.append("imageOutput", "embedded");
-    formData.append("tableMethod", "cluster");
-
-    const response = await fetch(`${backendUrl}/api/parse`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || `后端返回 ${response.status}`);
+    for (const selection of targets) {
+      const code = selectionCode(selection);
+      setStatus(`正在识别 ${code}...`);
+      await parseSelection(selection, code);
     }
-
-    state.backendResult = await response.json();
-    const markdownLength = state.backendResult.markdown?.length || 0;
-    const elementCount = Array.isArray(state.backendResult.json)
-      ? state.backendResult.json.length
-      : 0;
-    els.backendStatus.textContent = `已解析：${markdownLength} 字符 Markdown，${elementCount} 个结构元素`;
-    setStatus("OpenDataLoader 解析完成，可继续手动框选补充");
+    els.backendStatus.textContent = `已解析 ${targets.length} 个框选区域`;
+    setStatus("框选区域 OCR 完成");
+    renderSelectionList();
   } catch (error) {
     console.error(error);
-    els.backendStatus.textContent = error.message || "后端解析失败";
-    setStatus("后端解析失败，可继续手动框选");
+    els.backendStatus.textContent = error.message || "框选区域 OCR 失败";
+    setStatus("OCR 失败，可继续手动框选");
   } finally {
     updateActions();
   }
@@ -549,17 +528,6 @@ async function exportObsidianPackage() {
     "",
   ];
 
-  if (state.backendResult?.markdown) {
-    markdownParts.push("## OpenDataLoader PDF 自动解析");
-    markdownParts.push("");
-    markdownParts.push(state.backendResult.markdown.trim());
-    markdownParts.push("");
-    markdownParts.push("---");
-    markdownParts.push("");
-    markdownParts.push("## 手动框选补充");
-    markdownParts.push("");
-  }
-
   for (const selection of ordered) {
     const code = selectionCode(selection);
     const meta = TYPE_META[selection.type];
@@ -568,7 +536,10 @@ async function exportObsidianPackage() {
     markdownParts.push("");
 
     if (selection.type === "text") {
-      const extracted = await extractTextWithFallback(selection, code);
+      const extracted = await getParsedSelection(selection, code);
+      const path = `assets/text/${code}.png`;
+      root.file(path, extracted.imageBase64, { base64: true });
+
       if (extracted.text) {
         markdownParts.push(extracted.text);
         if (extracted.method === "ocr") {
@@ -576,14 +547,10 @@ async function exportObsidianPackage() {
           markdownParts.push("> OCR 识别结果，请按原文复核。");
         }
       } else {
-        const path = `assets/text/${code}.png`;
-        root.file(path, extracted.imageBase64 || (await cropSelection(selection)), {
-          base64: true,
-        });
-        markdownParts.push("未检测到 PDF 文本层，已保留原区域截图。");
-        markdownParts.push("");
-        markdownParts.push(`![[${path}]]`);
+        markdownParts.push("未识别到文字，已保留原区域截图。");
       }
+      markdownParts.push("");
+      markdownParts.push(`![[${path}]]`);
     }
 
     if (selection.type === "figure") {
@@ -594,24 +561,21 @@ async function exportObsidianPackage() {
 
     if (selection.type === "table") {
       const path = `assets/tables/${code}.png`;
-      root.file(path, await cropSelection(selection), { base64: true });
+      const extracted = await getParsedSelection(selection, code);
+      root.file(path, extracted.imageBase64, { base64: true });
       markdownParts.push(`![[${path}]]`);
-      markdownParts.push("");
-      markdownParts.push("| 字段 | 内容 |");
-      markdownParts.push("| --- | --- |");
-      markdownParts.push("|  |  |");
+      if (extracted.text) {
+        markdownParts.push("");
+        markdownParts.push("OCR 文本：");
+        markdownParts.push("");
+        markdownParts.push(extracted.text);
+      }
     }
 
     markdownParts.push("");
   }
 
   root.file(`${state.baseName}.md`, markdownParts.join("\n"));
-  if (state.backendResult?.json) {
-    root.file(
-      `${state.baseName}.opendataloader.json`,
-      JSON.stringify(state.backendResult.json, null, 2),
-    );
-  }
   root.file(
     "manifest.json",
     JSON.stringify(
@@ -660,19 +624,26 @@ function extractText(selection) {
     .join("\n");
 }
 
-async function extractTextWithFallback(selection, code) {
-  const pdfText = extractText(selection);
-  if (pdfText) {
-    return { text: pdfText, method: "pdf", imageBase64: null };
+async function getParsedSelection(selection, code) {
+  if (!selection.imageBase64 || selection.parsedText === undefined) {
+    await parseSelection(selection, code);
   }
 
+  return {
+    text: selection.parsedText || "",
+    method: selection.parsedMethod || "image",
+    imageBase64: selection.imageBase64,
+  };
+}
+
+async function parseSelection(selection, code) {
   const imageBase64 = await cropSelection(selection);
   const ocrText = await recognizeText(imageBase64, code);
-  return {
-    text: ocrText,
-    method: ocrText ? "ocr" : "image",
-    imageBase64,
-  };
+  const pdfText = selection.type === "text" ? extractText(selection) : "";
+
+  selection.imageBase64 = imageBase64;
+  selection.parsedText = ocrText || pdfText || "";
+  selection.parsedMethod = ocrText ? "ocr" : pdfText ? "pdf" : "image";
 }
 
 async function recognizeText(imageBase64, code) {
