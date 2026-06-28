@@ -146,6 +146,34 @@ span {
   font-weight: 700;
 }
 
+.backend-section {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.backend-url-row {
+  display: grid;
+  gap: 6px;
+}
+
+.backend-url-row span,
+#backendStatus {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#backendUrl {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  min-width: 0;
+  padding: 9px 10px;
+  width: 100%;
+}
+
 .tool-section {
   display: grid;
   gap: 10px;
@@ -230,6 +258,7 @@ span {
 }
 
 .primary-button,
+.secondary-button,
 .ghost-button {
   align-items: center;
   border-radius: var(--radius);
@@ -244,6 +273,12 @@ span {
 .primary-button {
   background: var(--ink);
   color: #fff;
+  font-weight: 800;
+}
+
+.secondary-button {
+  background: #e9f2f0;
+  color: var(--text-accent);
   font-weight: 800;
 }
 

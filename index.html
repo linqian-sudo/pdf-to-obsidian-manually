@@ -24,6 +24,19 @@
         </label>
         <input id="pdfInput" type="file" accept="application/pdf" />
 
+        <section class="tool-section backend-section" aria-label="OpenDataLoader 后端">
+          <div class="section-title">OpenDataLoader</div>
+          <label class="backend-url-row">
+            <span>后端地址</span>
+            <input id="backendUrl" type="url" value="http://127.0.0.1:8787" />
+          </label>
+          <button class="secondary-button" type="button" id="backendParseButton" disabled>
+            <i data-lucide="server-cog"></i>
+            <span>后端解析 PDF</span>
+          </button>
+          <small id="backendStatus">上传 PDF 后可自动解析整份文档</small>
+        </section>
+
         <section class="tool-section" aria-label="圈选工具">
           <div class="section-title">圈选类型</div>
           <div class="tool-grid" role="group" aria-label="选择圈选类型">

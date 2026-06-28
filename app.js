@@ -13,6 +13,7 @@ const TYPE_META = {
 
 const state = {
   pdf: null,
+  currentFile: null,
   pdfName: "",
   baseName: "PDF_Import",
   mode: "text",
@@ -20,6 +21,7 @@ const state = {
   selections: [],
   pageCanvases: new Map(),
   pageTexts: new Map(),
+  backendResult: null,
   activeSelectionId: null,
   counters: { text: 0, figure: 0, table: 0 },
 };
@@ -40,6 +42,9 @@ const els = {
   textCount: document.querySelector("#textCount"),
   figureCount: document.querySelector("#figureCount"),
   tableCount: document.querySelector("#tableCount"),
+  backendUrl: document.querySelector("#backendUrl"),
+  backendParseButton: document.querySelector("#backendParseButton"),
+  backendStatus: document.querySelector("#backendStatus"),
 };
 
 let renderToken = 0;
@@ -61,6 +66,12 @@ els.zoomIn.addEventListener("click", () => changeZoom(0.15));
 els.zoomOut.addEventListener("click", () => changeZoom(-0.15));
 els.clearButton.addEventListener("click", clearSelections);
 els.exportButton.addEventListener("click", exportObsidianPackage);
+els.backendParseButton.addEventListener("click", parseWithBackend);
+els.backendUrl.value =
+  localStorage.getItem("pdfToObsidianBackendUrl") || els.backendUrl.value;
+els.backendUrl.addEventListener("change", () => {
+  localStorage.setItem("pdfToObsidianBackendUrl", els.backendUrl.value.trim());
+});
 
 function setMode(mode) {
   state.mode = mode;
@@ -97,15 +108,18 @@ async function loadPdf(file) {
 
 function resetDocumentState(file) {
   state.pdf = null;
+  state.currentFile = file;
   state.pdfName = file.name;
   state.baseName = sanitizeName(file.name.replace(/\.pdf$/i, "")) || "PDF_Import";
   state.selections = [];
   state.pageCanvases.clear();
   state.pageTexts.clear();
+  state.backendResult = null;
   state.activeSelectionId = null;
   state.counters = { text: 0, figure: 0, table: 0 };
   els.fileName.textContent = file.name;
   els.documentStatus.textContent = "读取中";
+  els.backendStatus.textContent = "可调用 OpenDataLoader 后端自动解析";
   els.pdfViewer.innerHTML = "";
   renderSelectionList();
 }
@@ -460,8 +474,56 @@ function changeZoom(delta) {
 function updateActions() {
   const hasPdf = Boolean(state.pdf);
   const hasSelections = state.selections.length > 0;
-  els.exportButton.disabled = !hasPdf || !hasSelections;
+  els.exportButton.disabled = !hasPdf || (!hasSelections && !state.backendResult);
   els.clearButton.disabled = !hasSelections;
+  els.backendParseButton.disabled = !hasPdf || !state.currentFile;
+}
+
+async function parseWithBackend() {
+  if (!state.currentFile) return;
+
+  const backendUrl = els.backendUrl.value.trim().replace(/\/+$/, "");
+  if (!backendUrl) {
+    els.backendStatus.textContent = "请先填写后端地址";
+    return;
+  }
+
+  localStorage.setItem("pdfToObsidianBackendUrl", backendUrl);
+  els.backendParseButton.disabled = true;
+  els.backendStatus.textContent = "正在调用 OpenDataLoader PDF...";
+  setStatus("后端正在解析整份 PDF...");
+
+  try {
+    const formData = new FormData();
+    formData.append("pdf", state.currentFile, state.currentFile.name);
+    formData.append("format", "markdown,json");
+    formData.append("imageOutput", "embedded");
+    formData.append("tableMethod", "cluster");
+
+    const response = await fetch(`${backendUrl}/api/parse`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `后端返回 ${response.status}`);
+    }
+
+    state.backendResult = await response.json();
+    const markdownLength = state.backendResult.markdown?.length || 0;
+    const elementCount = Array.isArray(state.backendResult.json)
+      ? state.backendResult.json.length
+      : 0;
+    els.backendStatus.textContent = `已解析：${markdownLength} 字符 Markdown，${elementCount} 个结构元素`;
+    setStatus("OpenDataLoader 解析完成，可继续手动框选补充");
+  } catch (error) {
+    console.error(error);
+    els.backendStatus.textContent = error.message || "后端解析失败";
+    setStatus("后端解析失败，可继续手动框选");
+  } finally {
+    updateActions();
+  }
 }
 
 async function exportObsidianPackage() {
@@ -486,6 +548,17 @@ async function exportObsidianPackage() {
     `# ${state.baseName}`,
     "",
   ];
+
+  if (state.backendResult?.markdown) {
+    markdownParts.push("## OpenDataLoader PDF 自动解析");
+    markdownParts.push("");
+    markdownParts.push(state.backendResult.markdown.trim());
+    markdownParts.push("");
+    markdownParts.push("---");
+    markdownParts.push("");
+    markdownParts.push("## 手动框选补充");
+    markdownParts.push("");
+  }
 
   for (const selection of ordered) {
     const code = selectionCode(selection);
@@ -533,6 +606,12 @@ async function exportObsidianPackage() {
   }
 
   root.file(`${state.baseName}.md`, markdownParts.join("\n"));
+  if (state.backendResult?.json) {
+    root.file(
+      `${state.baseName}.opendataloader.json`,
+      JSON.stringify(state.backendResult.json, null, 2),
+    );
+  }
   root.file(
     "manifest.json",
     JSON.stringify(
